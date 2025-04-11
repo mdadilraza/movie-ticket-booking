@@ -6,6 +6,7 @@ import com.eidiko.user_service.dto.UserRequest;
 import com.eidiko.user_service.entity.User;
 import com.eidiko.user_service.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,12 +19,14 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final UserService userService;
 
     @PostMapping("/register")
     public ResponseEntity<User> register(@RequestBody UserRequest request) {
+        log.info("UserRequest {}" ,request);
         try {
             User user = userService.register(request);
             return ResponseEntity.ok(user);

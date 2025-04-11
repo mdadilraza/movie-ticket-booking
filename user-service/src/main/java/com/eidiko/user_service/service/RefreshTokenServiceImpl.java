@@ -5,6 +5,7 @@ import com.eidiko.user_service.entity.User;
 import com.eidiko.user_service.exception.UserNotFoundException;
 import com.eidiko.user_service.repository.RefreshTokenRepository;
 import com.eidiko.user_service.repository.UserRepository;
+import com.eidiko.user_service.security.CustomUserDetailsService;
 import com.eidiko.user_service.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,10 +21,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService{
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+    private final CustomUserDetailsService customUserDetailsService;
 
     public RefreshToken createRefreshToken(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        User user = (User) customUserDetailsService.loadUserByUsername(username);
 
         refreshTokenRepository.deleteByUserId(user.getId());
 

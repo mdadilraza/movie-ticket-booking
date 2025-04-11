@@ -8,14 +8,18 @@ import com.eidiko.user_service.entity.User;
 import com.eidiko.user_service.exception.UserAlreadyExistException;
 import com.eidiko.user_service.exception.UserNotFoundException;
 import com.eidiko.user_service.repository.UserRepository;
+import com.eidiko.user_service.security.CustomUserDetailsService;
 import com.eidiko.user_service.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -33,13 +37,15 @@ public class UserServiceImpl implements UserService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
+    private final CustomUserDetailsService customUserDetailsService;
 
     @Override
     public User register(UserRequest request) {
-        if (userRepository.existsByUsername(request.getUsername()) ||
-                userRepository.existsByEmail(request.getEmail())) {
-            throw new UserAlreadyExistException("Username or email already exists");
-        }
+        log.info("UserRequest {}", request);
+//        if (userRepository.existsByUsername(request.getUsername()) ||
+//                userRepository.existsByEmail(request.getEmail())) {
+//            throw new UserAlreadyExistException("Username or email already exists");
+//        }
 
         User user = new User();
         user.setUsername(request.getUsername());
@@ -48,7 +54,7 @@ public class UserServiceImpl implements UserService {
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
         user.setRole(request.getRole() != null ? request.getRole() : "USER");
-
+        log.info("User {}", user);
         return userRepository.save(user);
     }
 
@@ -57,16 +63,17 @@ public class UserServiceImpl implements UserService {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        if (authentication.isAuthenticated()) {
+            log.info("true");
+            String username = request.getUsername();
+            User user = (User) customUserDetailsService.loadUserByUsername(username);
+            log.info(String.valueOf(user));
+            String accessToken = jwtUtil.generateAccessToken(username, user.getRole());
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(username);
 
-        String username = request.getUsername();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        String accessToken = jwtUtil.generateAccessToken(username, user.getRole());
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(username);
-
-        return new AuthResponse(accessToken, refreshToken.getToken());
+            return new AuthResponse(accessToken, refreshToken.getToken());
+        }
+        return new AuthResponse();
     }
 
     @Override
@@ -108,4 +115,6 @@ public class UserServiceImpl implements UserService {
     public void delete(User user) {
         userRepository.delete(user);
     }
+
+
 }

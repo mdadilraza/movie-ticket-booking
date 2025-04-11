@@ -4,6 +4,7 @@ import com.eidiko.user_service.dto.AuthRequest;
 import com.eidiko.user_service.dto.AuthResponse;
 import com.eidiko.user_service.dto.UserRequest;
 import com.eidiko.user_service.entity.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 

@@ -22,18 +22,17 @@ spring:
           - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
       routes:
         - id: user-service
-          uri: lb://user-service
+          uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/auth/**
-            - Path=/api/users/**
+            - Path=/api/auth/**, /api/users/**
           filters:
             - name: AuthenticationFilter
               args:
                 skip: false
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka/
 server:
   port: 8085
