@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 @Service
 @RequiredArgsConstructor
@@ -25,13 +26,18 @@ public class RefreshTokenServiceImpl implements RefreshTokenService{
 
     public RefreshToken createRefreshToken(String username) {
         User user = (User) customUserDetailsService.loadUserByUsername(username);
+        log.info("User in createRefreshToken {}",user.getUsername());
 
-        refreshTokenRepository.deleteByUserId(user.getId());
+        RefreshToken byUserId = refreshTokenRepository.findByUserId(user.getId());
+        if(byUserId !=null) {
+            refreshTokenRepository.delete(byUserId);
+        }
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
-        refreshToken.setToken(jwtUtil.generateRefreshToken(username));
+        refreshToken.setToken(jwtUtil.generateRefreshToken(user.getUsername()));
         refreshToken.setExpiryDate(jwtUtil.getExpirationDateFromToken(refreshToken.getToken()));
+        log.info("refreshToken in createRefreshToken {}" ,refreshToken);
         return refreshTokenRepository.save(refreshToken);
     }
 

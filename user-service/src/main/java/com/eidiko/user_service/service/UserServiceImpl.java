@@ -13,17 +13,15 @@ import com.eidiko.user_service.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -42,10 +40,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public User register(UserRequest request) {
         log.info("UserRequest {}", request);
-//        if (userRepository.existsByUsername(request.getUsername()) ||
-//                userRepository.existsByEmail(request.getEmail())) {
-//            throw new UserAlreadyExistException("Username or email already exists");
-//        }
+        if (userRepository.existsByUsername(request.getUsername()) ||
+                userRepository.existsByEmail(request.getEmail())) {
+            throw new UserAlreadyExistException("Username or email already exists");
+        }
 
         User user = new User();
         user.setUsername(request.getUsername());
@@ -53,7 +51,7 @@ public class UserServiceImpl implements UserService {
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setRole(request.getRole() != null ? request.getRole() : "USER");
+        user.setRole(request.getRole() != null ? request.getRole().trim().toUpperCase() : "USER");
         log.info("User {}", user);
         return userRepository.save(user);
     }
@@ -63,16 +61,23 @@ public class UserServiceImpl implements UserService {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
+
         if (authentication.isAuthenticated()) {
-            log.info("true");
-            String username = request.getUsername();
-            User user = (User) customUserDetailsService.loadUserByUsername(username);
-            log.info(String.valueOf(user));
+            log.info("Authentication successful");
+
+            User user = (User) authentication.getPrincipal();
+            String username = user.getUsername();
+
             String accessToken = jwtUtil.generateAccessToken(username, user.getRole());
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(username);
 
+            if (refreshToken == null) {
+                throw new IllegalArgumentException("Failed to create refresh token for user: " + username);
+            }
+
             return new AuthResponse(accessToken, refreshToken.getToken());
         }
+
         return new AuthResponse();
     }
 
@@ -107,13 +112,30 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User update(User user) {
-        return userRepository.save(user);
+    public User update(String username , UserRequest request) {
+        return userRepository.findByUsername(username)
+                .map(existingUser -> {
+                    existingUser.setEmail(request.getEmail());
+                    existingUser.setFullName(request.getFullName());
+                    existingUser.setPhoneNumber(request.getPhoneNumber());
+                    existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+                    existingUser.setUsername(request.getUsername());
+                    existingUser.setRole(request.getRole().trim().toUpperCase());
+                   return  userRepository.save(existingUser);
+                })
+                .orElseThrow(() ->new  UserNotFoundException("UserNot Found "));
+
     }
 
     @Override
     public void delete(User user) {
-        userRepository.delete(user);
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+    @Override
+    public List<User> findAll() {
+        return userRepository.findByIsActiveTrue();
     }
 
 

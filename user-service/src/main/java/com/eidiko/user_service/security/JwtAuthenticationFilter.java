@@ -1,6 +1,7 @@
 package com.eidiko.user_service.security;
 
 import com.eidiko.user_service.entity.User;
+import com.eidiko.user_service.exception.JwtAuthenticationException;
 import com.eidiko.user_service.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -29,20 +30,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = null;
         String username = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-            username = jwtUtil.extractUsername(token);
+        try {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+                username = jwtUtil.extractUsername(token);
+            }
+
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                User user = (User) userDetailsService.loadUserByUsername(username);
+                if (jwtUtil.validateToken(token)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            }
+
+            filterChain.doFilter(request, response);
+
+        } catch (JwtAuthenticationException ex) {
+            logger.error("JWT Error: {}", ex);
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{ \"error\": \"" + ex.getMessage() + "\" }");
         }
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            User user = (User) userDetailsService.loadUserByUsername(username);
-            if (jwtUtil.validateToken(token)) {
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
-        }
+
         filterChain.doFilter(request, response);
+
     }
 }

@@ -1,9 +1,10 @@
 package com.eidiko.user_service.util;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
+import com.eidiko.user_service.exception.InvalidJwtException;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,10 +15,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Component
+@Slf4j
 public class JwtUtil {
-    private static final String SECRET_KEY = "5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437";
-    private static final long ACCESS_TOKEN_EXPIRATION = 1000 * 60 * 15; // 15 minutes
-    private static final long REFRESH_TOKEN_EXPIRATION = 1000 * 60 * 60 * 24 * 7; // 7 days
+    @Value("${jwt.secret}")
+    private String SECRET_KEY ;
+    @Value("${jwt.access-token.expiration}")
+    private  long ACCESS_TOKEN_EXPIRATION ;
+    @Value("${jwt.refresh-token.expiration}")
+    private  long REFRESH_TOKEN_EXPIRATION ;
 
     public String generateAccessToken(String username, String role) {
         Map<String, Object> claims = new HashMap<>();
@@ -27,7 +32,7 @@ public class JwtUtil {
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
-                .signWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes()))
+                .signWith(getSignInKey())
                 .compact();
     }
 
@@ -54,26 +59,38 @@ public class JwtUtil {
     }
 
 
-    public boolean validateToken(String token) {
+    public boolean validateToken(String token)  {
+        boolean result = false;
         try {
-            extractAllClaims(token); // If this doesn't throw, it's valid
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
+            log.info("Validating token {} " ,token);
+            Claims claims = extractAllClaims(token);
+           log.info("Claims {}" , claims);
+            result = true;
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            log.error("Token expired {}" , e.getMessage());
+        } catch (JwtException e) {
+            log.error("JWT error {} " , e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.error("Illegal argument {}" , e.getMessage());
         }
+        return result;
     }
 
     public Instant getExpirationDateFromToken(String token) {
         return extractAllClaims(token).getExpiration().toInstant();
     }
 
-    private Claims extractAllClaims(String token) {
-        return Jwts
-                .parserBuilder()
-                .setSigningKey(getSignInKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+    public Claims extractAllClaims(String token) {
+        try {
+            return Jwts.parser()
+                    .setSigningKey(SECRET_KEY)
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (MalformedJwtException | SignatureException | ExpiredJwtException | IllegalArgumentException e) {
+            log.error("JWT error: {}", e.getMessage());
+            throw new InvalidJwtException("Invalid JWT token", e);
+        }
     }
+
 
 }

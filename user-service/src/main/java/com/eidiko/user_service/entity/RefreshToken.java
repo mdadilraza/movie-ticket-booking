@@ -13,7 +13,7 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false ,unique = true)
     private String token;
 
     @ManyToOne
